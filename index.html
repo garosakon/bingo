@@ -1,211 +1,224 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Trophy, RotateCcw, Hash, Star, AlertCircle } from 'lucide-react';
-
-const App = () => {
-  const [grid, setGrid] = useState([]);
-  const [winningLines, setWinningLines] = useState([]); 
-  const [hasWon, setHasWon] = useState(false);
-
-  // 初始化遊戲
-  const initializeGame = useCallback(() => {
-    const numbers = Array.from({ length: 25 }, (_, i) => i + 1);
-    const shuffled = numbers.sort(() => Math.random() - 0.5);
-    setGrid(shuffled.map(num => ({ value: num, marked: false })));
-    setWinningLines([]);
-    setHasWon(false);
-  }, []);
-
-  useEffect(() => {
-    initializeGame();
-  }, [initializeGame]);
-
-  const toggleMark = (index) => {
-    const newGrid = [...grid];
-    newGrid[index].marked = !newGrid[index].marked;
-    setGrid(newGrid);
-  };
-
-  // 檢查所有可能的連線
-  useEffect(() => {
-    if (grid.length === 0) return;
-
-    const newWinningLines = [];
-
-    // 1. 橫向 (Rows)
-    for (let i = 0; i < 5; i++) {
-      if (grid.slice(i * 5, i * 5 + 5).every(item => item.marked)) {
-        newWinningLines.push({ type: 'row', index: i });
-      }
-    }
-
-    // 2. 縱向 (Cols)
-    for (let i = 0; i < 5; i++) {
-      if ([0, 1, 2, 3, 4].every(j => grid[i + j * 5].marked)) {
-        newWinningLines.push({ type: 'col', index: i });
-      }
-    }
-
-    // 3. 斜向 (Diagonals)
-    if ([0, 6, 12, 18, 24].every(i => grid[i].marked)) {
-      newWinningLines.push({ type: 'diag', index: 0 }); // 左上到右下
-    }
-    if ([4, 8, 12, 16, 20].every(i => grid[i].marked)) {
-      newWinningLines.push({ type: 'diag', index: 1 }); // 右上到左下
-    }
-
-    setWinningLines(newWinningLines);
-
-    if (newWinningLines.length >= 5 && !hasWon) {
-      setHasWon(true);
-    }
-  }, [grid, hasWon]);
-
-  // 計算 SVG 連線路徑
-  const renderLines = useMemo(() => {
-    return winningLines.map((line, i) => {
-      let x1, y1, x2, y2;
-      const step = 20; 
-      const offset = 10; 
-
-      if (line.type === 'row') {
-        x1 = "5%"; x2 = "95%";
-        y1 = y2 = `${line.index * step + offset}%`;
-      } else if (line.type === 'col') {
-        y1 = "5%"; y2 = "95%";
-        x1 = x2 = `${line.index * step + offset}%`;
-      } else if (line.type === 'diag') {
-        if (line.index === 0) {
-          x1 = "5%"; y1 = "5%"; x2 = "95%"; y2 = "95%";
-        } else {
-          x1 = "95%"; y1 = "5%"; x2 = "5%"; y2 = "95%";
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>手機賓果大賽</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .bingo-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
         }
-      }
+        .cell-active {
+            background-color: white;
+            color: #6366f1;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .line-draw {
+            transition: all 0.5s ease-in-out;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: dash 0.5s forwards;
+        }
+        @keyframes dash {
+            to { stroke-dashoffset: 0; }
+        }
+        @keyframes pulse-red {
+            0%, 100% { opacity: 0.7; stroke-width: 8; }
+            50% { opacity: 1; stroke-width: 10; }
+        }
+        .victory-line {
+            animation: dash 0.5s forwards, pulse-red 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center p-4 font-sans select-none overflow-x-hidden text-slate-800">
 
-      // 顏色邏輯：第 5 條之後用亮紅色，其餘用深藍色
-      const isVictoryLine = i >= 4;
-      const strokeColor = isVictoryLine ? "#ef4444" : "#6366f1";
-      const strokeWidth = isVictoryLine ? "8" : "6";
-
-      return (
-        <line
-          key={`${line.type}-${line.index}-${i}`}
-          x1={x1} y1={y1} x2={x2} y2={y2}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          className={`transition-all duration-500 opacity-70 ${isVictoryLine ? 'animate-pulse' : 'animate-in fade-in zoom-in'}`}
-        />
-      );
-    });
-  }, [winningLines]);
-
-  return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center p-4 font-sans select-none overflow-x-hidden">
-      
-      {/* 頂部區域：狀態顯示 */}
-      <div className="w-full max-w-md mb-4 flex flex-col gap-3">
-        {hasWon ? (
-          <div className="bg-red-600 text-white rounded-2xl p-4 shadow-lg flex items-center justify-between animate-bounce border-4 border-white">
-            <div className="flex items-center gap-3">
-              <Trophy size={32} className="text-yellow-300" />
-              <div>
-                <h2 className="text-2xl font-black italic tracking-widest">BINGO!</h2>
-                <p className="text-xs font-bold bg-black/20 px-2 py-0.5 rounded italic">達成 {winningLines.length} 條線</p>
-              </div>
-            </div>
-            <button 
-              onClick={initializeGame}
-              className="bg-white text-red-600 px-4 py-2 rounded-xl font-bold text-sm shadow-md active:scale-95"
-            >
-              新局
-            </button>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl p-4 shadow-sm flex justify-between items-center border border-slate-200">
-            <div className="flex items-center gap-3">
-              <div className="bg-slate-100 p-2 rounded-xl">
-                <Hash className="text-indigo-500" size={24} />
-              </div>
-              <div>
-                <h1 className="text-lg font-black text-slate-800">賓果爭霸戰</h1>
-                <p className="text-xs text-slate-400">距離 BINGO 剩餘 {Math.max(0, 5 - winningLines.length)} 條線</p>
-              </div>
-            </div>
-            <div className={`flex flex-col items-center justify-center w-12 h-12 rounded-full font-black ${winningLines.length >= 4 ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600'}`}>
-              {winningLines.length}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 賓果盤 */}
-      <div className="w-full max-w-md relative">
-        <div className={`aspect-square bg-slate-300 p-1.5 rounded-2xl shadow-xl grid grid-cols-5 gap-1.5 relative z-0 transition-colors duration-500 ${hasWon ? 'ring-8 ring-red-500/20' : ''}`}>
-          {grid.map((item, index) => (
-            <button
-              key={index}
-              onClick={() => toggleMark(index)}
-              className={`
-                relative flex items-center justify-center text-xl font-black rounded-xl transition-all duration-200 active:scale-90
-                ${item.marked 
-                  ? 'bg-white text-indigo-600 shadow-sm' 
-                  : 'bg-slate-50 text-slate-400'}
-              `}
-            >
-              {item.value}
-              {item.marked && (
-                <div className="absolute inset-0 flex items-center justify-center opacity-5">
-                   <Star size={40} fill="currentColor" />
+    <!-- 狀態欄 -->
+    <div id="status-card" class="w-full max-w-md mb-4">
+        <div class="bg-white rounded-2xl p-4 shadow-sm flex justify-between items-center border border-slate-200">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-100 p-2 rounded-xl text-indigo-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line></svg>
                 </div>
-              )}
-            </button>
-          ))}
+                <div>
+                    <h1 class="text-lg font-black">賓果爭霸戰</h1>
+                    <p id="line-hint" class="text-xs text-slate-400">距離 BINGO 剩餘 5 條線</p>
+                </div>
+            </div>
+            <div id="line-count-badge" class="flex flex-col items-center justify-center w-12 h-12 rounded-full font-black bg-indigo-100 text-indigo-600 transition-colors">
+                0
+            </div>
         </div>
-
-        {/* SVG 連線層 */}
-        <svg 
-          className="absolute inset-0 w-full h-full pointer-events-none z-10 p-1.5"
-        >
-          {renderLines}
-        </svg>
-      </div>
-
-      {/* 底部輔助資訊 */}
-      <div className="w-full max-w-md mt-6 flex flex-col gap-4">
-        <div className="flex justify-between items-center px-2">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-indigo-500 rounded-full"></div>
-            <span className="text-xs font-bold text-slate-500 text-center">進行中 (1~4線)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="text-xs font-bold text-red-500">勝出 (第5線!)</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 p-4 rounded-2xl flex items-start gap-3">
-          <AlertCircle className="text-slate-400 shrink-0" size={18} />
-          <p className="text-xs text-slate-500 leading-relaxed">
-            <span className="font-bold text-slate-700">防作弊提示：</span>
-            獲勝後背景不會遮蔽數字。請大家核對紅線與藍線覆蓋的數字是否正確，確保公平競爭！
-          </p>
-        </div>
-
-        <button 
-          onClick={initializeGame}
-          className="flex items-center justify-center gap-2 py-4 px-6 bg-slate-800 text-white rounded-2xl font-bold shadow-lg active:scale-[0.98] transition-all"
-        >
-          <RotateCcw size={18} />
-          重開新局
-        </button>
-      </div>
-
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full -z-20 opacity-10 pointer-events-none">
-        <div className={`absolute top-10 left-10 w-48 h-48 rounded-full blur-3xl transition-colors duration-1000 ${hasWon ? 'bg-red-400' : 'bg-indigo-300'}`}></div>
-        <div className={`absolute bottom-10 right-10 w-48 h-48 rounded-full blur-3xl transition-colors duration-1000 ${hasWon ? 'bg-red-300' : 'bg-blue-300'}`}></div>
-      </div>
     </div>
-  );
-};
 
-export default App;
+    <!-- 賓果盤容器 -->
+    <div class="w-full max-w-md relative">
+        <div id="bingo-board" class="aspect-square bg-slate-300 p-1.5 rounded-2xl shadow-xl bingo-grid relative z-0 transition-all duration-500">
+            <!-- 25個格子會由 JS 生成 -->
+        </div>
+
+        <!-- SVG 連線層 -->
+        <svg id="svg-layer" class="absolute inset-0 w-full h-full pointer-events-none z-10 p-1.5"></svg>
+    </div>
+
+    <!-- 底部資訊與按鈕 -->
+    <div class="w-full max-w-md mt-6 flex flex-col gap-4">
+        <div class="flex justify-between items-center px-2">
+            <div class="flex items-center gap-2 text-xs font-bold text-slate-500">
+                <div class="w-3 h-3 bg-indigo-500 rounded-full"></div>
+                進行中 (1~4線)
+            </div>
+            <div class="flex items-center gap-2 text-xs font-bold text-red-500">
+                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                聽牌/勝出 (5線!)
+            </div>
+        </div>
+
+        <div class="bg-white/70 border border-slate-200 p-4 rounded-2xl flex items-start gap-3">
+            <div class="text-slate-400 mt-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+            <p class="text-xs text-slate-500 leading-relaxed">
+                <span class="font-bold text-slate-700">防作弊機制：</span>
+                連線後數字保持可見。請與客廳好友核對喊出的數字。
+            </p>
+        </div>
+
+        <button onclick="initGame()" class="flex items-center justify-center gap-2 py-4 px-6 bg-slate-800 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M3 21v-5h5"></path></svg>
+            重新開局
+        </button>
+    </div>
+
+    <script>
+        let grid = [];
+        let winningLines = [];
+        const boardElement = document.getElementById('bingo-board');
+        const svgLayer = document.getElementById('svg-layer');
+        const lineCountBadge = document.getElementById('line-count-badge');
+        const lineHint = document.getElementById('line-hint');
+        const statusCard = document.getElementById('status-card');
+
+        function initGame() {
+            // 1. 生成與打亂數字
+            const numbers = Array.from({ length: 25 }, (_, i) => i + 1);
+            const shuffled = numbers.sort(() => Math.random() - 0.5);
+            grid = shuffled.map(num => ({ value: num, marked: false }));
+            winningLines = [];
+            
+            // 2. UI 重置
+            renderBoard();
+            svgLayer.innerHTML = '';
+            updateStatusUI();
+            boardElement.classList.remove('ring-8', 'ring-red-500/20');
+        }
+
+        function renderBoard() {
+            boardElement.innerHTML = '';
+            grid.forEach((item, index) => {
+                const btn = document.createElement('button');
+                btn.innerText = item.value;
+                btn.className = `relative flex items-center justify-center text-xl font-black rounded-xl transition-all duration-200 active:scale-90 h-full w-full ${item.marked ? 'cell-active' : 'bg-slate-50 text-slate-400'}`;
+                btn.onclick = () => toggleMark(index);
+                boardElement.appendChild(btn);
+            });
+        }
+
+        function toggleMark(index) {
+            grid[index].marked = !grid[index].marked;
+            checkLines();
+            renderBoard();
+        }
+
+        function checkLines() {
+            const newWinningLines = [];
+
+            // 橫向
+            for (let i = 0; i < 5; i++) {
+                if (grid.slice(i * 5, i * 5 + 5).every(item => item.marked)) {
+                    newWinningLines.push({ type: 'row', index: i });
+                }
+            }
+            // 縱向
+            for (let i = 0; i < 5; i++) {
+                if ([0, 1, 2, 3, 4].every(j => grid[i + j * 5].marked)) {
+                    newWinningLines.push({ type: 'col', index: i });
+                }
+            }
+            // 斜向
+            if ([0, 6, 12, 18, 24].every(i => grid[i].marked)) newWinningLines.push({ type: 'diag', index: 0 });
+            if ([4, 8, 12, 16, 20].every(i => grid[i].marked)) newWinningLines.push({ type: 'diag', index: 1 });
+
+            winningLines = newWinningLines;
+            drawLines();
+            updateStatusUI();
+        }
+
+        function drawLines() {
+            svgLayer.innerHTML = '';
+            winningLines.forEach((line, i) => {
+                const step = 20; 
+                const offset = 10;
+                let x1, y1, x2, y2;
+
+                if (line.type === 'row') {
+                    x1 = "5%"; x2 = "95%";
+                    y1 = y2 = `${line.index * step + offset}%`;
+                } else if (line.type === 'col') {
+                    y1 = "5%"; y2 = "95%";
+                    x1 = x2 = `${line.index * step + offset}%`;
+                } else if (line.type === 'diag') {
+                    if (line.index === 0) {
+                        x1 = "5%"; y1 = "5%"; x2 = "95%"; y2 = "95%";
+                    } else {
+                        x1 = "95%"; y1 = "5%"; x2 = "5%"; y2 = "95%";
+                    }
+                }
+
+                const isVictory = i >= 4;
+                const newLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                newLine.setAttribute("x1", x1);
+                newLine.setAttribute("y1", y1);
+                newLine.setAttribute("x2", x2);
+                newLine.setAttribute("y2", y2);
+                newLine.setAttribute("stroke", isVictory ? "#ef4444" : "#6366f1");
+                newLine.setAttribute("stroke-width", isVictory ? "10" : "6");
+                newLine.setAttribute("stroke-linecap", "round");
+                newLine.setAttribute("class", isVictory ? "line-draw victory-line" : "line-draw opacity-70");
+                svgLayer.appendChild(newLine);
+            });
+        }
+
+        function updateStatusUI() {
+            const count = winningLines.length;
+            lineCountBadge.innerText = count;
+            
+            if (count >= 5) {
+                statusCard.innerHTML = `
+                    <div class="bg-red-600 text-white rounded-2xl p-4 shadow-lg flex items-center justify-between animate-bounce border-4 border-white">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🏆</span>
+                            <div>
+                                <h2 class="text-2xl font-black italic tracking-widest">BINGO!</h2>
+                                <p class="text-xs font-bold bg-black/20 px-2 py-0.5 rounded">達成 ${count} 條線</p>
+                            </div>
+                        </div>
+                        <button onclick="initGame()" class="bg-white text-red-600 px-4 py-2 rounded-xl font-bold text-sm shadow-md active:scale-95">再玩一局</button>
+                    </div>
+                `;
+                boardElement.classList.add('ring-8', 'ring-red-500/20');
+            } else {
+                // 如果不是勝利狀態，確保顯示正常欄位
+                lineCountBadge.className = `flex flex-col items-center justify-center w-12 h-12 rounded-full font-black transition-colors ${count >= 4 ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600'}`;
+                lineHint.innerText = `距離 BINGO 剩餘 ${Math.max(0, 5 - count)} 條線`;
+            }
+        }
+
+        // 初始化
+        initGame();
+    </script>
+</body>
+</html>
